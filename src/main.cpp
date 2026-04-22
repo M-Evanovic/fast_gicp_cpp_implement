@@ -23,10 +23,12 @@ template <typename Registration>
 void align(Registration& reg,
             const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& target,
             const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& source,
+            const double max_correspondence_distance,
             pcl::PointCloud<pcl::PointXYZ>::Ptr& aligned) {
     auto t1 = std::chrono::high_resolution_clock::now();
     reg.setInputTarget(target);
     reg.setInputSource(source);
+    reg.setMaxCorrespondenceDistance(max_correspondence_distance);
     reg.align(*aligned);
     auto t2 = std::chrono::high_resolution_clock::now();
     std::cout << "align time cost: "
@@ -54,11 +56,13 @@ void colorize(const pcl::PointCloud<pcl::PointXYZ> &pc,
   }
 }
 
-// gicp_align target_pcd source_pcd det_range(optional) voxel_size(optional)
-// ./gicp_align ./data/map.pcd ./data/scan.pcd 20 0.5
+// gicp_align target_pcd source_pcd det_range(optional) voxel_size(optional) max_correspondence_distance(optional)
+// ./gicp_align ./data/map.pcd ./data/scan.pcd 30 0.5 3.0
 int main(int argc, char** argv) {
     if (argc < 3) {
-        std::cout << "usage: gicp_align target_pcd source_pcd" << std::endl;
+        std::cout << "Usage: gicp_align target_pcd source_pcd" << std::endl;
+        std::cout << "Optional Parameters: det_range voxel_size max_correspondence_distance" << std::endl;
+        std::cout << "Usage: gicp_align data/map.pcd data/scan.pcd det_range(optional) voxel_size(optional) max_correspondence_distance(optional)" << std::endl;
         return 0;
     }
 
@@ -79,7 +83,7 @@ int main(int argc, char** argv) {
     }
 
     // extract submap
-    double det_range = 100.0;
+    double det_range = 30.0;
     if (argc > 3) {
         char *endptr;
         det_range = strtof(argv[3], &endptr);
@@ -120,54 +124,68 @@ int main(int argc, char** argv) {
 
     std::cout << std::endl;
 
+    double max_correspondence_distance = 3.0;
+    if (argc > 5) {
+        char *endptr;
+        max_correspondence_distance = strtof(argv[5], &endptr);
+        std::cout << "max correspondence distance: " << max_correspondence_distance << "m" << std::endl;
+    }
+
+
     // align
     pcl::PointCloud<pcl::PointXYZ>::Ptr result_cloud(new pcl::PointCloud<pcl::PointXYZ>());
 
-    std::cout << "--- pcl_gicp ---" << std::endl;
-    pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> pcl_gicp;
-    align(pcl_gicp, target_cloud_down, source_cloud_down, result_cloud);
-    std::cout << "----------------" << std::endl << std::endl;
+    // pcl gicp
+    // std::cout << "--- pcl_gicp ---" << std::endl;
+    // pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> pcl_gicp;
+    // align(pcl_gicp, target_cloud_down, source_cloud_down, max_correspondence_distance, result_cloud);
+    // std::cout << "----------------" << std::endl << std::endl;
     
-    std::cout << "--- pcl_ndt ---" << std::endl;
-    pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> pcl_ndt;
-    pcl_ndt.setResolution(1.0);
-    align(pcl_ndt, target_cloud_down, source_cloud_down, result_cloud);
-    std::cout << "---------------" << std::endl << std::endl;
+    // pcl ndt
+    // std::cout << "--- pcl_ndt ---" << std::endl;
+    // pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> pcl_ndt;
+    // pcl_ndt.setResolution(1.0);
+    // align(pcl_ndt, target_cloud_down, source_cloud_down, max_correspondence_distance, result_cloud);
+    // std::cout << "---------------" << std::endl << std::endl;
 
+    // fast_gicp single thread
     std::cout << "--- fast gicp single thread ---" << std::endl;
     fast_gicp::FastGICPSingleThread<pcl::PointXYZ, pcl::PointXYZ> fast_gicp_st;
-    align(fast_gicp_st, target_cloud_down, source_cloud_down, result_cloud);
+    align(fast_gicp_st, target_cloud_down, source_cloud_down, max_correspondence_distance, result_cloud);
     std::cout << "-------------------------------" << std::endl << std::endl;
 
+    // fast_gicp multi threads
     std::cout << "--- fast gicp multi threads ---" << std::endl;
     fast_gicp::FastGICP<pcl::PointXYZ, pcl::PointXYZ> fast_gicp_mt;
     // fast_gicp uses all the CPU cores by default
     // fast_gicp_mt.setNumThreads(8);
-    align(fast_gicp_mt, target_cloud_down, source_cloud_down, result_cloud);
+    align(fast_gicp_mt, target_cloud_down, source_cloud_down, max_correspondence_distance, result_cloud);
     std::cout << "-------------------------------" << std::endl << std::endl;
 
-    fast_gicp::FastVGICP<pcl::PointXYZ, pcl::PointXYZ> fast_vgicp;
-    fast_vgicp.setResolution(2.0);
-    std::cout << "--- fast vgicp single thread ---" << std::endl;
-    fast_vgicp.setNumThreads(1);
-    align(fast_vgicp, target_cloud_down, source_cloud_down, result_cloud);
-    std::cout << "--------------------------------" << std::endl << std::endl;
+    // fast_vgicp single thread
+    // fast_gicp::FastVGICP<pcl::PointXYZ, pcl::PointXYZ> fast_vgicp;
+    // fast_vgicp.setResolution(2.0);
+    // std::cout << "--- fast vgicp single thread ---" << std::endl;
+    // fast_vgicp.setNumThreads(1);
+    // align(fast_vgicp, target_cloud_down, source_cloud_down, max_correspondence_distance, result_cloud);
+    // std::cout << "--------------------------------" << std::endl << std::endl;
 
-    std::cout << "--- fast vgicp multi threads ---" << std::endl;
-    fast_vgicp.setNumThreads(omp_get_max_threads());
-    align(fast_vgicp, target_cloud_down, source_cloud_down, result_cloud);
-    std::cout << "--------------------------------" << std::endl << std::endl;
+    // fast_vgicp multi threads
+    // std::cout << "--- fast vgicp multi threads ---" << std::endl;
+    // fast_vgicp.setNumThreads(omp_get_max_threads());
+    // align(fast_vgicp, target_cloud_down, source_cloud_down, max_correspondence_distance, result_cloud);
+    // std::cout << "--------------------------------" << std::endl << std::endl;
 
     #ifdef USE_CUDA
     std::cout << "--- ndt cuda (P2D) ---" << std::endl;
     fast_gicp::NDTCuda<pcl::PointXYZ, pcl::PointXYZ> ndt_cuda;
     ndt_cuda.setResolution(1.0);
     ndt_cuda.setDistanceMode(fast_gicp::NDTDistanceMode::P2D);
-    align(ndt_cuda, target_cloud_down, source_cloud_down, result_cloud);
+    align(ndt_cuda, target_cloud_down, source_cloud_down, max_correspondence_distance, result_cloud);
 
     std::cout << "--- ndt cuda (D2D) ---" << std::endl;
     ndt_cuda.setDistanceMode(fast_gicp::NDTDistanceMode::D2D);
-    align(ndt_cuda, target_cloud_down, source_cloud_down, result_cloud);
+    align(ndt_cuda, target_cloud_down, source_cloud_down, max_correspondence_distance, result_cloud);
 
     std::cout << "--- fast vgicp cuda (parallel_kdtree) ---" << std::endl;
     fast_gicp::FastVGICPCuda<pcl::PointXYZ, pcl::PointXYZ> fast_vgicp_cuda;
@@ -175,13 +193,13 @@ int main(int argc, char** argv) {
     // fast_vgicp_cuda uses CPU-based parallel KDTree in covariance estimation by default
     // on a modern CPU, it is faster than GPU_BRUTEFORCE
     // fast_vgicp_cuda.setNearestNeighborSearchMethod(fast_gicp::NearestNeighborMethod::CPU_PARALLEL_KDTREE);
-    align(fast_vgicp_cuda, target_cloud_down, source_cloud_down, result_cloud);
+    align(fast_vgicp_cuda, target_cloud_down, source_cloud_down, max_correspondence_distance, result_cloud);
 
     std::cout << "--- fast vgicp cuda (gpu_bruteforce) ---" << std::endl;
     // use GPU-based bruteforce nearest neighbor search for covariance estimation
     // this would be a good choice if your PC has a weak CPU and a strong GPU (e.g., NVIDIA Jetson)
     fast_vgicp_cuda.setNearestNeighborSearchMethod(fast_gicp::NearestNeighborMethod::GPU_BRUTEFORCE);
-    align(fast_vgicp_cuda, target_cloud_down, source_cloud_down, result_cloud);
+    align(fast_vgicp_cuda, target_cloud_down, source_cloud_down, max_correspondence_distance, result_cloud);
 
     std::cout << "--- fast vgicp cuda (gpu_rbf_kernel) ---" << std::endl;
     // use RBF-kernel-based covariance estimation
@@ -189,7 +207,7 @@ int main(int argc, char** argv) {
     fast_vgicp_cuda.setNearestNeighborSearchMethod(fast_gicp::NearestNeighborMethod::GPU_RBF_KERNEL);
     // kernel width (and distance threshold) need to be tuned
     fast_vgicp_cuda.setKernelWidth(0.5);
-    align(fast_vgicp_cuda, target_cloud_down, source_cloud_down, result_cloud);
+    align(fast_vgicp_cuda, target_cloud_down, source_cloud_down, max_correspondence_distance, result_cloud);
     #endif
 
     // visualization
