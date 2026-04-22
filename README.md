@@ -1,3 +1,5 @@
+## Statement
+Implement of pcl gicp, pcl ndt, fast_gicp single thread, fast_gicp multi threads, fast_vgicp single thread, fast_vgicp multi threads and their CUDA version.
 
 ## Installation
 ```
@@ -15,11 +17,11 @@ make
 
 ## Start
 ```
-./gicp_align target_pcd_path source_pcd_path det_range(optional) voxel_size(optional)  
+./gicp_align target_pcd_path source_pcd_path det_range(optional) voxel_size(optional) max_correspondence_distance(optional)  
 ```
 example
 ```
-./gicp_align ./data/map.pcd ./data/scan.pcd 50 0.5
+./gicp_align ./data/map.pcd ./data/scan.pcd 30 0.3 3
 ```
 
 ## Acknowledgments

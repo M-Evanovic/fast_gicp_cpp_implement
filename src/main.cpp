@@ -57,7 +57,7 @@ void colorize(const pcl::PointCloud<pcl::PointXYZ> &pc,
 }
 
 // gicp_align target_pcd source_pcd det_range(optional) voxel_size(optional) max_correspondence_distance(optional)
-// ./gicp_align ./data/map.pcd ./data/scan.pcd 30 0.5 3.0
+// ./gicp_align ./data/map.pcd ./data/scan.pcd 30 0.3 3.0
 int main(int argc, char** argv) {
     if (argc < 3) {
         std::cout << "Usage: gicp_align target_pcd source_pcd" << std::endl;
